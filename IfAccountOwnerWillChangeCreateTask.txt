@@ -1,0 +1,45 @@
+public class IfAccountOwnerWillChangeCreateTask {  
+    
+    private static final map<Id, user> sysAdminMap = new map<Id, user>([Select Id, Name from user where profile.Name='System Administrator']);
+    //public static Id devRecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByName().get('Prospect').getRecordTypeId();
+    //public static Id devRecordTypeId1 = Schema.SObjectType.Account.getRecordTypeInfosByName().get('Customer').getRecordTypeId();    
+    
+    public static void createTaks(Map<Id, Account> newAccountMap, Map<Id, Account> oldAccountMap)
+    {
+        
+        List<Task> tasksToCreate = new List<Task>();
+        Map<Id, List<Task>> accountIdByTasks = new Map<Id, List<Task>>();
+        List<Task> queryAllTasks = [Select Id, WhatId FROM Task WHERE WhatId IN :newAccountMap.keySet() Limit 50000];
+        for (Task t : queryAllTasks)
+        {
+            List<Task> tempList = accountIdByTasks.get(t.WhatId) == null ? new List<Task>() : accountIdByTasks.get(t.WhatId);
+            accountIdByTasks.put(t.WhatId, tempList);
+            tempList.add(t);
+        }
+        
+        for (Account acc : newAccountMap.values())
+        {
+            List<Task> tempList = accountIdByTasks.get(acc.Id) == null ? new List<Task>() : accountIdByTasks.get(acc.Id);
+            
+            if(tempList.isEmpty())
+            {
+                
+                if(!sysAdminMap.containsKey(acc.OwnerId) && sysAdminMap.containsKey(oldAccountMap.get(acc.Id).OwnerId))
+                {
+                    Task t =new Task();
+                    t.WhatId=acc.id;
+                    t.OwnerId=acc.OwnerId;
+                    t.ActivityDate = system.today() + 365;
+                    t.Subject='Test If Account Name Changes';
+                    t.Description='This is the Description';
+                    t.Status='Open';
+                    tasksToCreate.add(t);
+                }                
+            }
+        }
+        
+        if(!tasksToCreate.isEmpty())
+            insert tasksToCreate;
+            system.debug('tasksToCreate '+tasksToCreate);
+    }
+}
